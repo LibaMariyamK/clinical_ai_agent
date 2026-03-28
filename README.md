@@ -15,7 +15,11 @@
 - **Clean Dark UI** — Custom Streamlit interface with a professional clinical theme
 
 ---
+## 📸 Screenshot
 
+![ClinixAI Screenshot](screenshot.png)
+
+---
 ## 🧠 How the Agent Works
 
 ```
