@@ -3,7 +3,8 @@
 > A self-correcting medical AI agent built with LangGraph, Groq, ChromaDB, and Streamlit.  
 > Combines retrieval-augmented generation (RAG) from a medical knowledge base with web search fallback and multimodal vision analysis for medical imaging.
 
----
+
+![ClinixAI Screenshot](screenshot.png)
 
 ## ✨ Features
 
@@ -13,11 +14,6 @@
 - **Internal Knowledge Base** — Indexed from *The Gale Encyclopedia of Medicine (3rd Edition)* using ChromaDB + HuggingFace embeddings
 - **Persistent Vector Store** — ChromaDB is created once and reloaded on subsequent runs — no re-indexing needed
 - **Clean Dark UI** — Custom Streamlit interface with a professional clinical theme
-
----
-## 📸 Screenshot
-
-![ClinixAI Screenshot](screenshot.png)
 
 ---
 ## 🧠 How the Agent Works
