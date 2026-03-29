@@ -1,5 +1,6 @@
 import streamlit as st
 import base64
+import requests
 from PIL import Image
 from dotenv import load_dotenv
 
@@ -7,8 +8,9 @@ from agent import build_medical_agent, analyze_image
 
 load_dotenv()
 
-APP_NAME = "ClinixAI"
-APP_ICON = "🩺"
+APP_NAME   = "ClinixAI"
+APP_ICON   = "🩺"
+API_URL    = "http://localhost:8000"   # FastAPI server URL
 
 st.set_page_config(
     page_title=APP_NAME,
@@ -106,14 +108,12 @@ header[data-testid="stHeader"] {
 .sb-section   { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); padding: 1rem 0 0.4rem; border-bottom: 1px solid var(--border); margin-bottom: 0.6rem; }
 .sb-footer    { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.65rem; color: var(--text-muted); text-align: center; line-height: 1.8; }
 .sb-footer span { color: var(--accent-teal); font-weight: 600; }
+.api-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.65rem; font-family: var(--font-mono); border-radius: 20px; padding: 3px 10px; margin-top: 8px; border: 1px solid; }
+.api-badge.online  { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: #10b981; }
+.api-badge.offline { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
 [data-testid="stFileUploader"] { background: var(--bg-card) !important; border: 1.5px dashed var(--border) !important; border-radius: var(--radius-sm) !important; transition: border-color 0.2s, background 0.2s !important; }
 [data-testid="stFileUploader"]:hover { border-color: var(--accent-teal) !important; background: var(--bg-hover) !important; }
-.stButton > button {
-    background: linear-gradient(135deg, #0369a1, #0284c7) !important;
-    color: white !important; border: none !important; border-radius: var(--radius-sm) !important;
-    font-family: var(--font-main) !important; font-weight: 600 !important; font-size: 0.8rem !important;
-    letter-spacing: 0.03em; padding: 8px 16px !important; width: 100%; transition: all 0.2s ease !important;
-}
+.stButton > button { background: linear-gradient(135deg, #0369a1, #0284c7) !important; color: white !important; border: none !important; border-radius: var(--radius-sm) !important; font-family: var(--font-main) !important; font-weight: 600 !important; font-size: 0.8rem !important; letter-spacing: 0.03em; padding: 8px 16px !important; width: 100%; transition: all 0.2s ease !important; }
 .stButton > button:hover { background: linear-gradient(135deg, #0284c7, #0ea5e9) !important; box-shadow: 0 0 16px rgba(14,165,233,0.35) !important; transform: translateY(-1px); }
 [data-testid="stChatMessage"] { background: var(--bg-card) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; margin-bottom: 0.75rem !important; padding: 14px 18px !important; box-shadow: var(--shadow); transition: border-color 0.2s; }
 [data-testid="stChatMessage"]:hover { border-color: rgba(14,165,233,0.3) !important; }
@@ -170,6 +170,16 @@ if "messages" not in st.session_state:
 if "uploader_key" not in st.session_state:
     st.session_state["uploader_key"] = 0
 
+# ── Check if FastAPI is running ───────────────────────────────────────────────
+def api_is_online() -> bool:
+    try:
+        r = requests.get(f"{API_URL}/health", timeout=2)
+        return r.status_code == 200
+    except Exception:
+        return False
+
+use_api = api_is_online()
+
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown(f"""
@@ -179,6 +189,12 @@ with st.sidebar:
         <div class="sb-logo-ver">Clinical Assistant · v2.0</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # API status badge
+    if use_api:
+        st.markdown('<div class="api-badge online">⬤ API Online</div>', unsafe_allow_html=True)
+    else:
+        st.markdown('<div class="api-badge offline">⬤ API Offline — direct mode</div>', unsafe_allow_html=True)
 
     st.markdown('<div class="sb-section">🩻 Medical Imaging</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
@@ -203,21 +219,67 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-# ── HELPER — format source badge ──────────────────────────────────────────────
+# ── HELPERS ───────────────────────────────────────────────────────────────────
 def format_source_badge(src: str, pages: list) -> str:
-    """
-    Returns a readable source string for st.caption().
-    PDF: shows page numbers if available.
-    Web: shows external source label.
-    """
     if src == "WEB":
         return "🌐  Web Search — external source"
-    else:
-        if pages:
-            page_str = ", ".join(str(p) for p in pages)
-            return f"📄  Knowledge Base — Pages {page_str}"
+    if pages:
+        return f"📄  Knowledge Base — Pages {', '.join(str(p) for p in pages)}"
+    return "📄  Knowledge Base — Gale Encyclopedia of Medicine"
+
+
+def build_chat_history(messages: list, max_turns: int = 3) -> list:
+    history = []
+    for msg in messages:
+        if msg["role"] == "user":
+            history.append(f"User: {msg['content']}")
+        elif msg["role"] == "assistant":
+            history.append(f"Assistant: {msg['content']}")
+    return history[-(max_turns * 2):]
+
+
+def run_query(full_query: str, chat_history: list, image_data_url: str = None):
+    """
+    Routes the query to FastAPI if online, otherwise falls back
+    to calling the agent directly inside Streamlit.
+    """
+    if use_api:
+        # ── API mode ──────────────────────────────────────────────────────────
+        if image_data_url:
+            resp = requests.post(
+                f"{API_URL}/query-with-image",
+                json={
+                    "question":       full_query,
+                    "image_data_url": image_data_url,
+                    "chat_history":   chat_history,
+                },
+                timeout=120,
+            )
         else:
-            return "📄  Knowledge Base — Gale Encyclopedia of Medicine"
+            resp = requests.post(
+                f"{API_URL}/query",
+                json={
+                    "question":     full_query,
+                    "chat_history": chat_history,
+                },
+                timeout=120,
+            )
+        resp.raise_for_status()
+        data = resp.json()
+        return data["answer"], data["source"], data["pages"]
+
+    else:
+        # ── Direct mode (API offline fallback) ────────────────────────────────
+        result = st.session_state.agent.invoke({
+            "question":     full_query,
+            "chat_history": chat_history,
+            "pages":        [],
+        })
+        return (
+            result["answer"],
+            result.get("source", "unknown").upper(),
+            result.get("pages", []),
+        )
 
 # ── CHAT HISTORY DISPLAY ──────────────────────────────────────────────────────
 for message in st.session_state.messages:
@@ -251,38 +313,23 @@ if not st.session_state.messages:
     </div>
     """, unsafe_allow_html=True)
 
-# ── HELPER — build chat history ───────────────────────────────────────────────
-def build_chat_history(messages: list, max_turns: int = 3) -> list:
-    history = []
-    for msg in messages:
-        if msg["role"] == "user":
-            history.append(f"User: {msg['content']}")
-        elif msg["role"] == "assistant":
-            history.append(f"Assistant: {msg['content']}")
-    return history[-(max_turns * 2):]
-
 # ── MAIN CHAT LOOP ────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Enter clinical query…"):
 
-    user_msg_data = {"role": "user", "content": prompt}
+    user_msg_data  = {"role": "user", "content": prompt}
+    image_data_url = None
 
     if uploaded_file:
         image = Image.open(uploaded_file)
         user_msg_data["image"] = image
-
         uploaded_file.seek(0)
-        b64_image      = base64.b64encode(uploaded_file.read()).decode("utf-8")
-        image_data_url = f"data:image/jpeg;base64,{b64_image}"
-
-        with st.spinner("🩻 Analysing imaging features…"):
-            image_description = analyze_image(image_data_url)
-
-        full_query = f"User Question: {prompt}\n\nClinical Image Analysis: {image_description}"
+        b64            = base64.b64encode(uploaded_file.read()).decode("utf-8")
+        image_data_url = f"data:image/jpeg;base64,{b64}"
+        full_query     = prompt   # vision enrichment handled inside run_query/API
     else:
         full_query = prompt
 
     chat_history = build_chat_history(st.session_state.messages)
-
     st.session_state.messages.append(user_msg_data)
 
     with st.chat_message("user", avatar="👤"):
@@ -291,25 +338,23 @@ if prompt := st.chat_input("Enter clinical query…"):
             st.image(image, width=180)
 
     with st.chat_message("assistant", avatar=APP_ICON):
-        with st.spinner("🧠 Thinking — Retrieving → Grading → Generating…"):
-            try:
-                result = st.session_state.agent.invoke({
-                    "question":     full_query,
-                    "chat_history": chat_history,
-                    "pages":        [],   # initialise empty — retrieve_node fills it
-                })
-                answer = result["answer"]
-                source = result.get("source", "unknown").upper()
-                pages  = result.get("pages", [])   # ← NEW
+        spinner_text = "🧠 Thinking — Retrieving → Grading → Generating…"
+        if use_api:
+            spinner_text = "🌐 Calling API — Retrieving → Grading → Generating…"
 
+        with st.spinner(spinner_text):
+            try:
+                answer, source, pages = run_query(
+                    full_query, chat_history, image_data_url
+                )
                 st.markdown(answer)
-                st.caption(format_source_badge(source, pages))   # ← NEW
+                st.caption(format_source_badge(source, pages))
 
                 st.session_state.messages.append({
                     "role":    "assistant",
                     "content": answer,
                     "source":  source,
-                    "pages":   pages,    # ← NEW: saved so history display works too
+                    "pages":   pages,
                 })
 
             except Exception as e:

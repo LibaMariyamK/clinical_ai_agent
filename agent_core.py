@@ -1,6 +1,7 @@
-# agent.py
+# agent_core.py
+# Pure agent logic — no Streamlit dependency.
+# Used by both api.py (FastAPI) and agent.py (Streamlit wrapper).
 
-import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
@@ -8,6 +9,7 @@ from langchain_community.tools import DuckDuckGoSearchRun
 from langgraph.graph import END, StateGraph, START
 from typing import TypedDict, List
 from langchain_core.messages import HumanMessage
+from functools import lru_cache
 
 from retriever import get_retriever
 
@@ -23,13 +25,15 @@ class AgentState(TypedDict):
     pages:              List[int]
 
 
-@st.cache_resource
+@lru_cache(maxsize=1)
 def load_llm():
+    """Main reasoning model — cached with lru_cache (no Streamlit needed)."""
     return ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3, max_retries=2)
 
 
-@st.cache_resource
+@lru_cache(maxsize=1)
 def load_vision_model():
+    """Vision model — cached with lru_cache (no Streamlit needed)."""
     return ChatGroq(
         model="meta-llama/llama-4-scout-17b-16e-instruct",
         temperature=0.3,
@@ -37,7 +41,7 @@ def load_vision_model():
     )
 
 
-# ── Type-specific analysis prompts ───────────────────────────────────────────
+# ── Type-specific analysis prompts ────────────────────────────────────────────
 
 IMAGE_PROMPTS = {
     "chest_xray": """You are an experienced radiologist reviewing a chest X-Ray.
@@ -56,6 +60,7 @@ STRICT RULES:
 - Do NOT report a finding unless you are confident it is present.
 - Be specific about locations.
 - Do not provide a definitive diagnosis.""",
+
     "brain_mri": """You are an experienced neuroradiologist reviewing a brain MRI.
 Analyse the image systematically:
 
@@ -135,7 +140,6 @@ Analyse this medical image strictly scientifically:
 Do not provide a definitive diagnosis.""",
 }
 
-# ── Keywords used to classify image type from detection response ──────────────
 IMAGE_TYPE_KEYWORDS = {
     "chest_xray":  ["chest x-ray", "chest xray", "chest radiograph", "cxr", "chest film"],
     "brain_mri":   ["brain mri", "head mri", "cerebral mri", "cranial mri", "brain magnetic"],
@@ -149,10 +153,7 @@ IMAGE_TYPE_KEYWORDS = {
 
 
 def detect_image_type(image_data_url: str, vision_llm) -> str:
-    """
-    Stage 1: Ask the vision model to identify what type of medical image this is.
-    Returns one of the keys in IMAGE_TYPE_KEYWORDS or 'general'.
-    """
+    """Stage 1 — detect what type of medical image this is."""
     detect_prompt = HumanMessage(
         content=[
             {
@@ -171,7 +172,6 @@ def detect_image_type(image_data_url: str, vision_llm) -> str:
     response = vision_llm.invoke([detect_prompt]).content.lower().strip()
     print(f"--- IMAGE TYPE DETECTED: {response} ---")
 
-    # Match response to known types
     for image_type, keywords in IMAGE_TYPE_KEYWORDS.items():
         if any(kw in response for kw in keywords):
             print(f"--- MATCHED TYPE: {image_type} ---")
@@ -193,24 +193,20 @@ def analyze_image(image_data_url: str) -> str:
     image_type = detect_image_type(image_data_url, vision_llm)
 
     # Stage 2 — analyse with appropriate prompt
-    analysis_prompt_text = IMAGE_PROMPTS[image_type]
-
     analysis_prompt = HumanMessage(
         content=[
-            {"type": "text",      "text": analysis_prompt_text},
+            {"type": "text",      "text": IMAGE_PROMPTS[image_type]},
             {"type": "image_url", "image_url": {"url": image_data_url}},
         ]
     )
-
     analysis = vision_llm.invoke([analysis_prompt]).content
     print(f"--- IMAGE ANALYSIS COMPLETE ({image_type}) ---")
 
-    # Return with type label so generate_node knows context
     return f"[Image type: {image_type.replace('_', ' ').title()}]\n\n{analysis}"
 
 
-def build_medical_agent():
-    """Constructs the Self-Correcting RAG Graph."""
+def build_agent():
+    """Constructs and compiles the LangGraph agent."""
 
     llm             = load_llm()
     retriever       = get_retriever()
