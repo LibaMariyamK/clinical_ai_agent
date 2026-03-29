@@ -6,6 +6,7 @@
 
 ![ClinixAI Screenshot](screenshot.png)
 
+
 ## ✨ Features
 
 - **Agentic RAG Pipeline** — A LangGraph-powered graph that retrieves, grades, and generates answers autonomously
@@ -18,32 +19,7 @@
 ---
 ## 🧠 How the Agent Works
 
-```
-User Question
-      │
-      ▼
- [Retrieve Node]
- Search ChromaDB (PDF knowledge base)
-      │
-      ▼
- [Grader Node]  ◄── Self-Reflection
- Is the retrieved context relevant?
-      │
-   ┌──┴──┐
-  YES    NO
-   │      │
-   │   [Web Search Node]
-   │   DuckDuckGo search fallback
-   │      │
-   └──────┘
-      │
-      ▼
- [Generate Node]
- Llama 3.3 70B produces final answer
-      │
-      ▼
-   Response
-```
+<img src="architecture.svg" alt="ClinixAI System Design & Agent Workflow" width="800"/>
 
 ---
 
