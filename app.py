@@ -1,16 +1,13 @@
+import os
 import streamlit as st
 import base64
-import requests
 from PIL import Image
 from dotenv import load_dotenv
 
-from agent import build_medical_agent, analyze_image
-
 load_dotenv()
 
-APP_NAME   = "ClinixAI"
-APP_ICON   = "🩺"
-API_URL    = "http://localhost:8000"   # FastAPI server URL
+APP_NAME = "ClinixAI"
+APP_ICON = "🩺"
 
 st.set_page_config(
     page_title=APP_NAME,
@@ -44,7 +41,6 @@ st.markdown("""
     --radius-sm:       8px;
     --shadow:          0 4px 24px rgba(0,0,0,0.4);
 }
-
 html, body, [class*="css"] {
     font-family: var(--font-main) !important;
     color: var(--text-primary) !important;
@@ -108,12 +104,10 @@ header[data-testid="stHeader"] {
 .sb-section   { font-size: 0.62rem; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); padding: 1rem 0 0.4rem; border-bottom: 1px solid var(--border); margin-bottom: 0.6rem; }
 .sb-footer    { margin-top: 1.6rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.65rem; color: var(--text-muted); text-align: center; line-height: 1.8; }
 .sb-footer span { color: var(--accent-teal); font-weight: 600; }
-.api-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 0.65rem; font-family: var(--font-mono); border-radius: 20px; padding: 3px 10px; margin-top: 8px; border: 1px solid; }
-.api-badge.online  { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.25); color: #10b981; }
-.api-badge.offline { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.25); color: #f59e0b; }
-[data-testid="stFileUploader"] { background: var(--bg-card) !important; border: 1.5px dashed var(--border) !important; border-radius: var(--radius-sm) !important; transition: border-color 0.2s, background 0.2s !important; }
+.key-input input { background: var(--bg-card) !important; color: var(--text-primary) !important; border: 1px solid var(--border) !important; border-radius: var(--radius-sm) !important; font-family: var(--font-mono) !important; font-size: 0.75rem !important; }
+[data-testid="stFileUploader"] { background: var(--bg-card) !important; border: 1.5px dashed var(--border) !important; border-radius: var(--radius-sm) !important; }
 [data-testid="stFileUploader"]:hover { border-color: var(--accent-teal) !important; background: var(--bg-hover) !important; }
-.stButton > button { background: linear-gradient(135deg, #0369a1, #0284c7) !important; color: white !important; border: none !important; border-radius: var(--radius-sm) !important; font-family: var(--font-main) !important; font-weight: 600 !important; font-size: 0.8rem !important; letter-spacing: 0.03em; padding: 8px 16px !important; width: 100%; transition: all 0.2s ease !important; }
+.stButton > button { background: linear-gradient(135deg, #0369a1, #0284c7) !important; color: white !important; border: none !important; border-radius: var(--radius-sm) !important; font-family: var(--font-main) !important; font-weight: 600 !important; font-size: 0.8rem !important; padding: 8px 16px !important; width: 100%; transition: all 0.2s ease !important; }
 .stButton > button:hover { background: linear-gradient(135deg, #0284c7, #0ea5e9) !important; box-shadow: 0 0 16px rgba(14,165,233,0.35) !important; transform: translateY(-1px); }
 [data-testid="stChatMessage"] { background: var(--bg-card) !important; border: 1px solid var(--border) !important; border-radius: var(--radius) !important; margin-bottom: 0.75rem !important; padding: 14px 18px !important; box-shadow: var(--shadow); transition: border-color 0.2s; }
 [data-testid="stChatMessage"]:hover { border-color: rgba(14,165,233,0.3) !important; }
@@ -162,23 +156,14 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
-if "agent" not in st.session_state:
-    with st.spinner("🔧 Initialising agent…"):
-        st.session_state.agent = build_medical_agent()
-if "messages" not in st.session_state:
+if "messages"     not in st.session_state:
     st.session_state.messages = []
 if "uploader_key" not in st.session_state:
     st.session_state["uploader_key"] = 0
-
-# ── Check if FastAPI is running ───────────────────────────────────────────────
-def api_is_online() -> bool:
-    try:
-        r = requests.get(f"{API_URL}/health", timeout=2)
-        return r.status_code == 200
-    except Exception:
-        return False
-
-use_api = api_is_online()
+if "agent"        not in st.session_state:
+    st.session_state.agent = None
+if "api_key_set"  not in st.session_state:
+    st.session_state.api_key_set = False
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -190,11 +175,50 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # API status badge
-    if use_api:
-        st.markdown('<div class="api-badge online">⬤ API Online</div>', unsafe_allow_html=True)
+    # ── API Key input ──────────────────────────────────────────────────────
+    st.markdown('<div class="sb-section">🔑 Groq API Key</div>', unsafe_allow_html=True)
+
+    # Check if key is already set via environment (local dev) or secrets (Streamlit Cloud)
+    env_key = os.environ.get("GROQ_API_KEY", "")
+
+    if env_key:
+        # Key already set via .env or Streamlit secrets — no input needed
+        groq_api_key = env_key
+        st.markdown("""
+        <div style="font-size:0.72rem; color:#10b981; padding:6px 0;">
+            ✅ API key configured
+        </div>
+        """, unsafe_allow_html=True)
     else:
-        st.markdown('<div class="api-badge offline">⬤ API Offline — direct mode</div>', unsafe_allow_html=True)
+        # User must enter key manually (cloud deployment)
+        groq_api_key = st.text_input(
+            "Enter your Groq API key",
+            type="password",
+            placeholder="gsk_...",
+            label_visibility="collapsed",
+            key="groq_key_input",
+        )
+        st.markdown("""
+        <div style="font-size:0.68rem; color:#475569; padding:4px 0 8px;">
+            Get a free key at
+            <a href="https://console.groq.com" target="_blank"
+               style="color:#0ea5e9;">console.groq.com</a>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # Set key in environment so LangChain picks it up
+    if groq_api_key and groq_api_key != st.session_state.get("last_key", ""):
+        os.environ["GROQ_API_KEY"] = groq_api_key
+        st.session_state["last_key"] = groq_api_key
+        # Reset agent so it rebuilds with new key
+        st.session_state.agent     = None
+        st.session_state.api_key_set = True
+
+    # ── Initialise agent only after key is set ─────────────────────────────
+    if groq_api_key and st.session_state.agent is None:
+        from agent import build_medical_agent
+        with st.spinner("🔧 Initialising agent…"):
+            st.session_state.agent = build_medical_agent()
 
     st.markdown('<div class="sb-section">🩻 Medical Imaging</div>', unsafe_allow_html=True)
     uploaded_file = st.file_uploader(
@@ -237,49 +261,19 @@ def build_chat_history(messages: list, max_turns: int = 3) -> list:
             history.append(f"Assistant: {msg['content']}")
     return history[-(max_turns * 2):]
 
-
-def run_query(full_query: str, chat_history: list, image_data_url: str = None):
-    """
-    Routes the query to FastAPI if online, otherwise falls back
-    to calling the agent directly inside Streamlit.
-    """
-    if use_api:
-        # ── API mode ──────────────────────────────────────────────────────────
-        if image_data_url:
-            resp = requests.post(
-                f"{API_URL}/query-with-image",
-                json={
-                    "question":       full_query,
-                    "image_data_url": image_data_url,
-                    "chat_history":   chat_history,
-                },
-                timeout=120,
-            )
-        else:
-            resp = requests.post(
-                f"{API_URL}/query",
-                json={
-                    "question":     full_query,
-                    "chat_history": chat_history,
-                },
-                timeout=120,
-            )
-        resp.raise_for_status()
-        data = resp.json()
-        return data["answer"], data["source"], data["pages"]
-
-    else:
-        # ── Direct mode (API offline fallback) ────────────────────────────────
-        result = st.session_state.agent.invoke({
-            "question":     full_query,
-            "chat_history": chat_history,
-            "pages":        [],
-        })
-        return (
-            result["answer"],
-            result.get("source", "unknown").upper(),
-            result.get("pages", []),
-        )
+# ── GATE — show prompt if no API key ─────────────────────────────────────────
+if not groq_api_key:
+    st.markdown("""
+    <div class="empty-state">
+        <div class="empty-state-icon">🔑</div>
+        <div class="empty-state-title">Enter your Groq API key to begin</div>
+        <div class="empty-state-body">
+            Add your free Groq API key in the sidebar to start using ClinixAI.
+            Your key is never stored — it only lives in your browser session.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    st.stop()   # Stop rendering — nothing below runs without a key
 
 # ── CHAT HISTORY DISPLAY ──────────────────────────────────────────────────────
 for message in st.session_state.messages:
@@ -316,16 +310,26 @@ if not st.session_state.messages:
 # ── MAIN CHAT LOOP ────────────────────────────────────────────────────────────
 if prompt := st.chat_input("Enter clinical query…"):
 
-    user_msg_data  = {"role": "user", "content": prompt}
-    image_data_url = None
+    # Safety check — agent must be ready
+    if st.session_state.agent is None:
+        st.error("⚠ Please enter your Groq API key in the sidebar first.")
+        st.stop()
+
+    from agent import analyze_image
+
+    user_msg_data = {"role": "user", "content": prompt}
 
     if uploaded_file:
         image = Image.open(uploaded_file)
         user_msg_data["image"] = image
         uploaded_file.seek(0)
-        b64            = base64.b64encode(uploaded_file.read()).decode("utf-8")
-        image_data_url = f"data:image/jpeg;base64,{b64}"
-        full_query     = prompt   # vision enrichment handled inside run_query/API
+        b64_image      = base64.b64encode(uploaded_file.read()).decode("utf-8")
+        image_data_url = f"data:image/jpeg;base64,{b64_image}"
+
+        with st.spinner("🩻 Analysing imaging features…"):
+            image_description = analyze_image(image_data_url)
+
+        full_query = f"User Question: {prompt}\n\nClinical Image Analysis: {image_description}"
     else:
         full_query = prompt
 
@@ -338,15 +342,17 @@ if prompt := st.chat_input("Enter clinical query…"):
             st.image(image, width=180)
 
     with st.chat_message("assistant", avatar=APP_ICON):
-        spinner_text = "🧠 Thinking — Retrieving → Grading → Generating…"
-        if use_api:
-            spinner_text = "🌐 Calling API — Retrieving → Grading → Generating…"
-
-        with st.spinner(spinner_text):
+        with st.spinner("🧠 Thinking — Retrieving → Grading → Generating…"):
             try:
-                answer, source, pages = run_query(
-                    full_query, chat_history, image_data_url
-                )
+                result = st.session_state.agent.invoke({
+                    "question":     full_query,
+                    "chat_history": chat_history,
+                    "pages":        [],
+                })
+                answer = result["answer"]
+                source = result.get("source", "unknown").upper()
+                pages  = result.get("pages", [])
+
                 st.markdown(answer)
                 st.caption(format_source_badge(source, pages))
 

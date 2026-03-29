@@ -7,24 +7,58 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 
-# Paths
+# ── Paths ─────────────────────────────────────────────────────────────────────
 DB_PATH  = "./chroma_db_data"
 PDF_PATH = "The-Gale-Encyclopedia-of-Medicine-3rd-Edition.pdf"
+
+# ── Google Drive direct download URL ─────────────────────────────────────────
+# Steps to get this URL:
+# 1. Upload your PDF to Google Drive
+# 2. Right-click → Share → Anyone with the link → Copy link
+# 3. Your link looks like:
+#    https://drive.google.com/file/d/FILE_ID/view?usp=sharing
+# 4. Replace FILE_ID below with your actual file ID
+# 5. The download URL format is:
+#    https://drive.google.com/uc?export=download&id=FILE_ID
+
+GDRIVE_FILE_ID  = "1prjbub7OanD6ErwOPLaoHBfs8K99Y6u3"   # google drive - gale encyclopedia... pdf
+GDRIVE_PDF_URL  = f"https://drive.google.com/uc?export=download&id={GDRIVE_FILE_ID}"
+
+
+def download_pdf_if_missing():
+    """
+    Downloads the PDF from Google Drive if it doesn't exist locally.
+    This runs on Streamlit Cloud where the PDF is not in the repo.
+    """
+    if os.path.exists(PDF_PATH):
+        return True
+
+    st.info("📥 Downloading medical knowledge base — this runs once…")
+    try:
+        import requests
+        with requests.get(GDRIVE_PDF_URL, stream=True) as r:
+            r.raise_for_status()
+            with open(PDF_PATH, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    f.write(chunk)
+        st.success("✅ Knowledge base downloaded successfully.")
+        return True
+    except Exception as e:
+        st.error(f"❌ Failed to download PDF: {e}")
+        st.info("Please set GDRIVE_FILE_ID in retriever.py to your Google Drive file ID.")
+        return False
 
 
 @st.cache_resource
 def load_embedding_model():
     """
     Loads PubMedBERT embedding model.
-    Trained on PubMed biomedical literature — significantly better
-    than general-purpose MiniLM for medical terminology retrieval.
-
-    Previous model : sentence-transformers/all-MiniLM-L6-v2  (general)
-    Current model  : NeuML/pubmedbert-base-embeddings          (medical)
+    Trained on PubMed biomedical literature — better than
+    general-purpose MiniLM for medical terminology retrieval.
     """
     return HuggingFaceEmbeddings(
         model_name="NeuML/pubmedbert-base-embeddings",
-        model_kwargs={"device": "cpu"},       # cpu is fine for inference
+        model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True},
     )
 
@@ -33,10 +67,8 @@ def load_embedding_model():
 def get_retriever():
     """
     Initialises or loads the Vector Database (ChromaDB).
+    Downloads PDF from Google Drive if not found locally.
     Returns a retriever object used to search the PDF.
-
-    NOTE: If you change the embedding model, delete chroma_db_data/
-    and let it rebuild — old vectors are incompatible with new embeddings.
     """
     embedding_model = load_embedding_model()
 
@@ -47,32 +79,34 @@ def get_retriever():
             embedding_function=embedding_model,
         )
         print("Loaded existing Vector Store.")
+        return vectorstore.as_retriever(
+            search_type="similarity",
+            search_kwargs={"k": 4},
+        )
 
-    else:
-        # 2. Build DB from PDF
-        if not os.path.exists(PDF_PATH):
-            st.error(f"PDF file not found: {PDF_PATH}")
-            return None
+    # 2. Download PDF if missing (cloud deployment)
+    if not download_pdf_if_missing():
+        return None
 
-        with st.spinner("📖 Indexing medical knowledge base — this runs once and may take a few minutes…"):
-            loader = PyMuPDFLoader(PDF_PATH)
-            # Exclude front matter and index pages (same slice as original)
-            doc    = loader.load()[30:-439]
+    # 3. Build DB from PDF
+    with st.spinner("📖 Indexing medical knowledge base — this runs once and may take a few minutes…"):
+        loader = PyMuPDFLoader(PDF_PATH)
+        doc    = loader.load()[30:-439]
 
-            text_splitter = RecursiveCharacterTextSplitter(
-                chunk_size=1000,
-                chunk_overlap=200,
-            )
-            splits = text_splitter.split_documents(doc)
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+        )
+        splits = text_splitter.split_documents(doc)
 
-            vectorstore = Chroma.from_documents(
-                documents=splits,
-                embedding=embedding_model,
-                persist_directory=DB_PATH,
-            )
-        print("Created new Vector Store with PubMedBERT embeddings.")
+        vectorstore = Chroma.from_documents(
+            documents=splits,
+            embedding=embedding_model,
+            persist_directory=DB_PATH,
+        )
+    print("Created new Vector Store with PubMedBERT embeddings.")
 
     return vectorstore.as_retriever(
         search_type="similarity",
-        search_kwargs={"k": 4},   # return top 4 most relevant chunks
+        search_kwargs={"k": 4},
     )
