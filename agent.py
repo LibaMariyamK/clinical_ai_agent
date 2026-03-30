@@ -281,6 +281,8 @@ Rewritten question:"""
         print("--- WEB SEARCH ---")
         question = state.get("rewritten_question") or state["question"]
         results  = web_search_tool.invoke(f"medical info: {question}")
+        if isinstance(results, list):
+            results = "\n\n".join(r.get("content", str(r)) for r in results)
         return {"context": results, "source": "web", "pages": []}
 
     def grade_documents_node(state: AgentState):

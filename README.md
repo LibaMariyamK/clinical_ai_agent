@@ -89,9 +89,21 @@ Create a `.env` file in the root directory:
 
 ```env
 GROQ_API_KEY=your_groq_api_key_here
+
+# Optional: configure web search provider ('duckduckgo' or 'tavily', default: duckduckgo)
+SEARCH_PROVIDER=duckduckgo
+
+# Required when SEARCH_PROVIDER=tavily; obtain from https://app.tavily.com
+# TAVILY_API_KEY=tvly-your_tavily_api_key_here
 ```
 
 Get your free Groq API key at [console.groq.com](https://console.groq.com).
+
+| Variable | Required | Description |
+|---|---|---|
+| `GROQ_API_KEY` | Yes | Groq LLM API key |
+| `SEARCH_PROVIDER` | No | `duckduckgo` (default) or `tavily` |
+| `TAVILY_API_KEY` | When `SEARCH_PROVIDER=tavily` | Tavily API key from [app.tavily.com](https://app.tavily.com) |
 
 ### 5. Download the knowledge base PDF
 
