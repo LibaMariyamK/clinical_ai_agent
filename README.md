@@ -3,7 +3,7 @@
 > A self-correcting medical AI agent built with LangGraph, Groq, ChromaDB, and Streamlit.  
 > Combines retrieval-augmented generation (RAG) from a medical knowledge base with web search fallback and multimodal vision analysis for medical imaging.
 
-### 🌐 Live Demo - [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://clinical-ai-agent-clinixai.streamlit.app/)
+### 🌐 Live Demo 👉 [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://clinical-ai-agent-clinixai.streamlit.app/)
 
 ---
 
