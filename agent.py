@@ -1,10 +1,12 @@
 # agent.py
 
+import os
 import streamlit as st
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_community.tools.tavily_search import TavilySearchResults
 from langgraph.graph import END, StateGraph, START
 from typing import TypedDict, List
 from langchain_core.messages import HumanMessage
@@ -214,7 +216,12 @@ def build_medical_agent():
 
     llm             = load_llm()
     retriever       = get_retriever()
-    web_search_tool = DuckDuckGoSearchRun()
+
+    search_provider = os.environ.get("SEARCH_PROVIDER", "duckduckgo").lower()
+    if search_provider == "tavily":
+        web_search_tool = TavilySearchResults(max_results=5)
+    else:
+        web_search_tool = DuckDuckGoSearchRun()
 
     # ── NODES ────────────────────────────────────────────────────────────────
 
