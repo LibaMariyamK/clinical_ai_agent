@@ -226,4 +226,4 @@ This project is licensed under the MIT License.
 - [NeuML](https://huggingface.co/NeuML) — PubMedBERT embeddings
 - [Streamlit](https://streamlit.io) — UI framework
 - [RAGAS](https://github.com/explodinggradients/ragas) — RAG evaluation
-- *The Gale Encyclopedia of Medicine, 3rd Edition* — medical knowledge base
+- [The Gale Encyclopedia of Medicine, 3rd Edition](https://staibabussalamsula.ac.id/wp-content/uploads/2024/06/The-Gale-Encyclopedia-of-Medicine-3rd-Edition-staibabussalamsula.ac_.id_.pdf) — medical knowledge base
