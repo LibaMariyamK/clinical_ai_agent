@@ -1,0 +1,48 @@
+{
+  "summary": {
+    "faithfulness": 0.85,
+    "answer_relevancy": 0.8,
+    "context_precision": 0.6,
+    "overall_average": 0.75,
+    "questions_tested": 5,
+    "evaluation_method": "LLM-as-judge (Llama 3.3 70B)",
+    "embeddings": "NeuML/pubmedbert-base-embeddings"
+  },
+  "per_question": [
+    {
+      "question": "What are the symptoms of appendicitis?",
+      "answer": "The symptoms of appendicitis include: \n\n1. Abdominal pain, which often becomes rigid and tender to the touch.\n2. Loss of appetite.\n3. Nausea and vomiting (in about half of the cases).\n4. Constipation or diarrhea (occasionally).\n5. Normal or slightly elevated temperature, with the presence of a fever possibly indicating a ruptured appendix.\n\nNote: The typical sequence of symptoms is present in about 50% of cases, while the other half may exhibit less typical patterns, especially in pregnant women, older patients, and infants.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 1.0,
+      "context_precision": 0.75
+    },
+    {
+      "question": "How is Type 2 diabetes diagnosed?",
+      "answer": "The text does not provide a direct answer to how Type 2 diabetes is diagnosed. However, it does mention that \"It is not unusual for Type II diabetes to be detected while a patient is seeing a doctor about another health concern that is actually being caused by the yet undiagnosed diabetes.\" This suggests that diagnosis may occur during a doctor's visit for a related health issue, but the specific diagnostic methods are not mentioned in the provided context.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 0.25,
+      "context_precision": 0.5
+    },
+    {
+      "question": "What is the treatment for pneumonia?",
+      "answer": "The treatment for pneumonia is not explicitly stated in the context, but it is mentioned that people with COPD should be vaccinated against pneumonia with a one-time pneumococcal (pneumonia) vaccine to prevent pulmonary infection. Additionally, antibiotics are frequently given at the first sign of a respiratory infection, such as increased sputum production or a change in color of sputum from clear to yellow or green, which may be indicative of pneumonia.",
+      "faithfulness": 0.5,
+      "answer_relevancy": 0.75,
+      "context_precision": 0.25
+    },
+    {
+      "question": "What are the causes of hypertension?",
+      "answer": "The causes of hypertension can be primary (essential) or secondary. \n\nPrimary (essential) hypertension is the most common type, and its cause is not known in 90 to 95 percent of the people who have it.\n\nSecondary hypertension is caused by another medical condition, such as:\n- Kidney disorders: The kidneys regulate the balance of salt and water in the body. If the kidneys cannot rid the body of excess salt and water, blood pressure goes up. Kidney infections, a narrowing of the arteries that carry blood to the kidneys (renal artery stenosis), and other kidney disorders can disturb the salt and water balance.\n- Cushing\u2019s syndrome and tumors of the pituitary and adrenal glands, which can increase levels of the adrenal gland hormones cortisol, adrenalin, and aldosterone, leading to hypertension.\n- Blood vessel diseases\n- Thyroid gland disorders\n- Some prescribed drugs\n- Alcoholism\n- Pregnancy\n\nNote that temporary increases in blood pressure due to physical activity or stressful situations are not considered hypertension. A diagnosis of hypertension is made only when a person has multiple high blood pressure readings over a period of time.",
+      "faithfulness": 1.0,
+      "answer_relevancy": 1.0,
+      "context_precision": 0.75
+    },
+    {
+      "question": "What are the early signs of Alzheimer's disease?",
+      "answer": "The early signs of Alzheimer's disease include: \n\n1. Forgetting recent events or conversations\n2. Difficulty with problem-solving or abstract thinking\n3. Misplacing things\n4. Changes in mood or behavior\n5. Changes in personality\n6. Loss of initiative\n7. Poor or decreased judgment\n8. Problems with memory, such as forgetting the names of family members or what was said at the beginning of a sentence.\n\nAdditionally, people with Alzheimer's may become lost or disoriented on a walk around the neighborhood, have trouble sleeping, and suffer from confusion or agitation in the evening. \n\nIt's worth noting that these symptoms can also be caused by other conditions, so a thorough evaluation by a physician is necessary to determine the underlying cause.",
+      "faithfulness": 0.75,
+      "answer_relevancy": 1.0,
+      "context_precision": 0.75
+    }
+  ]
+}

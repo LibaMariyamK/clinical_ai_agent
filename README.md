@@ -182,30 +182,19 @@ The vision model automatically detects and applies specialist prompts for:
 
 <br>
 
-## 📊 Evaluation (RAGAS)
+## 📊 Evaluation
 
-The pipeline is evaluated using [RAGAS](https://github.com/explodinggradients/ragas), a framework for measuring RAG quality.
+Evaluated on 5 clinical questions using a custom LLM-as-judge framework (Llama 3.3 70B):
 
-**To run evaluation:**
-```bash
-# Install evaluation dependencies first
-pip install ragas datasets
+| Metric | Score | Meaning |
+|---|---|---|
+| Answer Faithfulness | 0.85 ✅ | Answers stay grounded in retrieved context |
+| Answer Relevancy | 0.80 ✅ | Answers directly address the questions asked |
+| Context Precision | 0.60 ⚠ | Retrieved chunks are relevant to the query |
+| **Overall Average** | **0.75** | |
 
-# Run
-python evaluate.py
-```
-
-**Metrics measured:**
-
-| Metric | What it checks |
-|---|---|
-| Answer Faithfulness | Did the LLM stay grounded in retrieved context, or hallucinate? |
-| Answer Relevancy | Did the answer actually address the question asked? |
-| Context Precision | Did the retriever fetch chunks relevant to the query? |
-
-Results are saved to `evaluation_results.json`.
-
-> Scores will be added here after evaluation run.
+> Evaluated using `NeuML/pubmedbert-base-embeddings` over the Gale Encyclopedia of Medicine (5 questions).
+> Evaluation script: `evaluate.py`
 
 <br>
 
